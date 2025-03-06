@@ -1,1 +1,1 @@
-{'loginserver_path': None, 'gameserver_path': None}
+{"loginserver_path": "C:/Users/usuario/Proyectos/dual-dos/loginserver.bat", "gameserver_path": "C:/Users/usuario/Proyectos/dual-dos/gameserver.bat"}

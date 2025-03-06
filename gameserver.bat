@@ -1,0 +1,6 @@
+@echo off
+echo Starting GameServer...
+:loop
+echo GameServer running...
+timeout /t 5 >nul
+goto loop

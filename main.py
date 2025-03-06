@@ -4,6 +4,8 @@ import subprocess
 import tkinter as tk
 from tkinter import filedialog, messagebox
 import win32com.client
+import threading  # Importar el módulo threading
+import json  # Importar el módulo json
 
 def resolve_shortcut(path):
     """ Resolve um atalho .lnk para seu caminho real. """
@@ -26,23 +28,20 @@ class DualConsoleApp:
         self.gameserver_process = None
         
         self.create_widgets()
+        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)  # Manejar el evento de cierre de la ventana
     
     def create_widgets(self):
         # Título e seleção do LoginServer
         self.label_login = tk.Label(self.root, text="LoginServer", font=("Arial", 12, "bold"))
         self.label_login.grid(row=0, column=0, sticky="ew")
-        self.btn_select_login = tk.Button(self.root, text="Selecionar .bat", command=self.select_login_bat)
-        self.btn_select_login.grid(row=1, column=0, sticky="ew")
         
         # Título e seleção do GameServer
         self.label_game = tk.Label(self.root, text="GameServer", font=("Arial", 12, "bold"))
-        self.label_game.grid(row=3, column=0, sticky="ew")
-        self.btn_select_game = tk.Button(self.root, text="Selecionar .bat", command=self.select_game_bat)
-        self.btn_select_game.grid(row=4, column=0, sticky="ew")
+        self.label_game.grid(row=2, column=0, sticky="ew")
         
         # PanedWindow for resizable consoles
         self.paned_window = tk.PanedWindow(self.root, orient=tk.VERTICAL)
-        self.paned_window.grid(row=2, column=0, rowspan=3, sticky="nsew")
+        self.paned_window.grid(row=1, column=0, rowspan=3, sticky="nsew")
         
         # Console do LoginServer
         self.text_login = tk.Text(self.paned_window, height=10, width=100, state=tk.DISABLED)
@@ -52,25 +51,37 @@ class DualConsoleApp:
         self.text_game = tk.Text(self.paned_window, height=10, width=100, state=tk.DISABLED)
         self.paned_window.add(self.text_game)
         
+        # Panel for buttons
+        self.button_panel = tk.Frame(self.root)
+        self.button_panel.grid(row=4, column=0, pady=5, sticky="ew")
+        
+        # Botão Selecionar LoginServer
+        self.btn_select_login = tk.Button(self.button_panel, text="LS", command=self.select_login_bat, font=("Arial", 10, "bold"))
+        self.btn_select_login.pack(side=tk.LEFT, padx=5)
+        
+        # Botão Selecionar GameServer
+        self.btn_select_game = tk.Button(self.button_panel, text="GS", command=self.select_game_bat, font=("Arial", 10, "bold"))
+        self.btn_select_game.pack(side=tk.LEFT, padx=5)
+        
         # Botão StartEngine
-        self.btn_start = tk.Button(self.root, text="Start", command=self.start_engine, font=("Arial", 10, "bold"))
-        self.btn_start.grid(row=6, column=0, pady=5, sticky="ew")
+        self.btn_start = tk.Button(self.button_panel, text="Start", command=self.start_engine, font=("Arial", 10, "bold"))
+        self.btn_start.pack(side=tk.LEFT, padx=5)
         
         # Botão StopEngine
-        self.btn_stop = tk.Button(self.root, text="Stop", command=self.stop_engine, font=("Arial", 10, "bold"))
-        self.btn_stop.grid(row=7, column=0, pady=5, sticky="ew")
+        self.btn_stop = tk.Button(self.button_panel, text="Stop", command=self.stop_engine, font=("Arial", 10, "bold"))
+        self.btn_stop.pack(side=tk.LEFT, padx=5)
         
         # Botão Save Config
-        self.btn_save_config = tk.Button(self.root, text="Save Config", command=self.save_config, font=("Arial", 10, "bold"))
-        self.btn_save_config.grid(row=8, column=0, pady=5, sticky="ew")
+        self.btn_save_config = tk.Button(self.button_panel, text="Save", command=self.save_config, font=("Arial", 10, "bold"))
+        self.btn_save_config.pack(side=tk.LEFT, padx=5)
         
         # Botão Load Config
-        self.btn_load_config = tk.Button(self.root, text="Load Config", command=self.load_config, font=("Arial", 10, "bold"))
-        self.btn_load_config.grid(row=9, column=0, pady=5, sticky="ew")
+        self.btn_load_config = tk.Button(self.button_panel, text="Load", command=self.load_config, font=("Arial", 10, "bold"))
+        self.btn_load_config.pack(side=tk.LEFT, padx=5)
         
         # Botão Reset Interface
-        self.btn_reset = tk.Button(self.root, text="Reset", command=self.reset_interface, font=("Arial", 10, "bold"))
-        self.btn_reset.grid(row=10, column=0, pady=5, sticky="ew")
+        self.btn_reset = tk.Button(self.button_panel, text="Reset", command=self.reset_interface, font=("Arial", 10, "bold"))
+        self.btn_reset.pack(side=tk.LEFT, padx=5)
     
     def reset_interface(self):
         self.loginserver_path = None
@@ -104,14 +115,14 @@ class DualConsoleApp:
             if not messagebox.askokcancel("Aviso", "Nem todos os arquivos foram carregados. Continuar mesmo assim?"):
                 return
         
-        # Inicia os servidores
+        # Inicia os servidores em threads separados
         if self.loginserver_path:
             self.loginserver_process = subprocess.Popen(self.loginserver_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            self.monitor_process(self.loginserver_process, self.text_login)
+            threading.Thread(target=self.monitor_process, args=(self.loginserver_process, self.text_login)).start()
         
         if self.gameserver_path:
             self.gameserver_process = subprocess.Popen(self.gameserver_path, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            self.monitor_process(self.gameserver_process, self.text_game)
+            threading.Thread(target=self.monitor_process, args=(self.gameserver_process, self.text_game)).start()
     
     def stop_engine(self):
         if self.loginserver_process:
@@ -137,7 +148,7 @@ class DualConsoleApp:
                 text_widget.config(state=tk.DISABLED)
                 text_widget.see(tk.END)
         
-        self.root.after(100, read_output)
+        threading.Thread(target=read_output).start()  # Iniciar a leitura da saída em um thread separado
     
     def save_config(self):
         config = {
@@ -145,13 +156,13 @@ class DualConsoleApp:
             "gameserver_path": self.gameserver_path
         }
         with open("config.txt", "w") as config_file:
-            config_file.write(str(config))
+            json.dump(config, config_file)  # Usar json.dump para salvar a configuração
         messagebox.showinfo("Configuração", "Configurações salvas com sucesso!")
     
     def load_config(self):
         try:
             with open("config.txt", "r") as config_file:
-                config = eval(config_file.read())
+                config = json.load(config_file)  # Usar json.load para carregar a configuração
                 self.loginserver_path = config.get("loginserver_path")
                 self.gameserver_path = config.get("gameserver_path")
                 messagebox.showinfo("Configuração", "Configurações carregadas com sucesso!")
@@ -159,6 +170,12 @@ class DualConsoleApp:
             messagebox.showerror("Erro", "Arquivo de configuração não encontrado!")
         except Exception as e:
             messagebox.showerror("Erro", f"Erro ao carregar configurações: {e}")
+
+    def on_closing(self):
+        """ Maneja el evento de cierre de la ventana. """
+        if messagebox.askokcancel("Sair", "Você quer sair?"):
+            self.stop_engine()  # Asegurarse de que los procesos se terminen
+            self.root.destroy()
 
 if __name__ == "__main__":
     if sys.platform != "win32":
